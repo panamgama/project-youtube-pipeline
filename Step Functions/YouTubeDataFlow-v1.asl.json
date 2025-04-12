@@ -1,0 +1,182 @@
+{
+  "Comment": "A description of my state machine",
+  "StartAt": "Call YouTube API",
+  "States": {
+    "Call YouTube API": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Arguments": {
+        "FunctionName": "arn:aws:lambda:ap-southeast-2:440744231700:function:pullYouTubeData:$LATEST"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "Check Data Pull Result",
+      "Output": {
+        "LambdaOutput": "{% $states.result.Payload.status %}"
+      },
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "Check Data Pull Result",
+          "Output": {
+            "LambdaOutput": "ERROR"
+          }
+        }
+      ]
+    },
+    "Check Data Pull Result": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Next": "Glue Transformations",
+          "Condition": "{% ($states.input.LambdaOutput) = (\"SUCCESS\") %}"
+        }
+      ],
+      "Default": "Faliure Notification - Pull failed"
+    },
+    "Faliure Notification - Pull failed": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Arguments": {
+        "Message": "{% $states.input %}",
+        "TopicArn": "arn:aws:sns:ap-southeast-2:440744231700:YTpipeline"
+      },
+      "Next": "Fail"
+    },
+    "Glue Transformations": {
+      "Type": "Parallel",
+      "Branches": [
+        {
+          "StartAt": "Channel Data Transformation",
+          "States": {
+            "Channel Data Transformation": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::glue:startJobRun",
+              "Arguments": {
+                "JobName": "Transform Channel Data-partitioning"
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Video Data Transformation",
+          "States": {
+            "Video Data Transformation": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::glue:startJobRun",
+              "Arguments": {
+                "JobName": "Transform Video Data-partitioning"
+              },
+              "End": true
+            }
+          }
+        }
+      ],
+      "Next": "Wait for glue jobs"
+    },
+    "Wait for glue jobs": {
+      "Type": "Wait",
+      "Seconds": 90,
+      "Next": "StartCrawler"
+    },
+    "StartCrawler": {
+      "Type": "Task",
+      "Arguments": {
+        "Name": "Glue_analysis"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+      "Next": "Wait for crawler"
+    },
+    "Wait for crawler": {
+      "Type": "Wait",
+      "Seconds": 90,
+      "Next": "Push data to Google Sheets"
+    },
+    "Push data to Google Sheets": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": {
+        "LambdaOutput": "{% $states.result.Payload.status %}"
+      },
+      "Arguments": {
+        "FunctionName": "arn:aws:lambda:ap-southeast-2:440744231700:function:pushYouTubeDataGoogleDrive:$LATEST"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "Check Data Push Result",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "Check Data Push Result",
+          "Output": {
+            "LambdaOutput": "ERROR"
+          }
+        }
+      ]
+    },
+    "Check Data Push Result": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Next": "Send Notification Email (Success)",
+          "Condition": "{% ($states.input.LambdaOutput) = (\"SUCCESS\") %}"
+        }
+      ],
+      "Default": "Faliure Notification - Push failed"
+    },
+    "Send Notification Email (Success)": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Arguments": {
+        "Message": "SUCCESS: Pipeline executed successfully",
+        "TopicArn": "arn:aws:sns:ap-southeast-2:440744231700:YTpipeline"
+      },
+      "Next": "Success"
+    },
+    "Success": {
+      "Type": "Succeed"
+    },
+    "Faliure Notification - Push failed": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Arguments": {
+        "Message": "{% $states.input %}",
+        "TopicArn": "arn:aws:sns:ap-southeast-2:440744231700:YTpipeline"
+      },
+      "End": true
+    },
+    "Fail": {
+      "Type": "Fail"
+    }
+  },
+  "QueryLanguage": "JSONata"
+}

@@ -1,0 +1,273 @@
+Resources:
+  StateMachine7c3b9650:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      Definition:
+        Comment: A description of my state machine
+        StartAt: Call YouTube API
+        States:
+          Call YouTube API:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            Arguments:
+              FunctionName: ${lambdainvoke_FunctionName_cf20c182}
+            Retry:
+              - ErrorEquals:
+                  - Lambda.ServiceException
+                  - Lambda.AWSLambdaException
+                  - Lambda.SdkClientException
+                  - Lambda.TooManyRequestsException
+                IntervalSeconds: 1
+                MaxAttempts: 3
+                BackoffRate: 2
+                JitterStrategy: FULL
+            Next: Check Data Pull Result
+            Output:
+              LambdaOutput: '{% $states.result.Payload.status %}'
+            Catch:
+              - ErrorEquals:
+                  - States.ALL
+                Next: Check Data Pull Result
+                Output:
+                  LambdaOutput: ERROR
+          Check Data Pull Result:
+            Type: Choice
+            Choices:
+              - Next: Glue Transformations
+                Condition: '{% ($states.input.LambdaOutput) = ("SUCCESS") %}'
+            Default: Faliure Notification - Pull failed
+          Faliure Notification - Pull failed:
+            Type: Task
+            Resource: arn:aws:states:::sns:publish
+            Arguments:
+              Message: '{% $states.input %}'
+              TopicArn: ${snspublish_TopicArn_9f7c7b61}
+            Next: Fail
+          Glue Transformations:
+            Type: Parallel
+            Branches:
+              - StartAt: Channel Data Transformation
+                States:
+                  Channel Data Transformation:
+                    Type: Task
+                    Resource: arn:aws:states:::glue:startJobRun
+                    Arguments:
+                      JobName: ${gluestartJobRun_JobName_332c7705}
+                    End: true
+              - StartAt: Video Data Transformation
+                States:
+                  Video Data Transformation:
+                    Type: Task
+                    Resource: arn:aws:states:::glue:startJobRun
+                    Arguments:
+                      JobName: ${gluestartJobRun_JobName_a2ae2ae4}
+                    End: true
+            Next: Wait for glue jobs
+          Wait for glue jobs:
+            Type: Wait
+            Seconds: 90
+            Next: StartCrawler
+          StartCrawler:
+            Type: Task
+            Arguments:
+              Name: Glue_analysis
+            Resource: arn:aws:states:::aws-sdk:glue:startCrawler
+            Next: Wait for crawler
+          Wait for crawler:
+            Type: Wait
+            Seconds: 90
+            Next: Push data to Google Sheets
+          Push data to Google Sheets:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            Output:
+              LambdaOutput: '{% $states.result.Payload.status %}'
+            Arguments:
+              FunctionName: ${lambdainvoke_FunctionName_0cebf9d3}
+            Retry:
+              - ErrorEquals:
+                  - Lambda.ServiceException
+                  - Lambda.AWSLambdaException
+                  - Lambda.SdkClientException
+                  - Lambda.TooManyRequestsException
+                IntervalSeconds: 1
+                MaxAttempts: 3
+                BackoffRate: 2
+                JitterStrategy: FULL
+            Next: Check Data Push Result
+            Catch:
+              - ErrorEquals:
+                  - States.ALL
+                Next: Check Data Push Result
+                Output:
+                  LambdaOutput: ERROR
+          Check Data Push Result:
+            Type: Choice
+            Choices:
+              - Next: Send Notification Email (Success)
+                Condition: '{% ($states.input.LambdaOutput) = ("SUCCESS") %}'
+            Default: Faliure Notification - Push failed
+          Send Notification Email (Success):
+            Type: Task
+            Resource: arn:aws:states:::sns:publish
+            Arguments:
+              Message: 'SUCCESS: Pipeline executed successfully'
+              TopicArn: ${snspublish_TopicArn_9f7c7b61}
+            Next: Success
+          Success:
+            Type: Succeed
+          Faliure Notification - Push failed:
+            Type: Task
+            Resource: arn:aws:states:::sns:publish
+            Arguments:
+              Message: '{% $states.input %}'
+              TopicArn: ${snspublish_TopicArn_9f7c7b61}
+            End: true
+          Fail:
+            Type: Fail
+        QueryLanguage: JSONata
+      DefinitionSubstitutions:
+        lambdainvoke_FunctionName_cf20c182: >-
+          arn:aws:lambda:ap-southeast-2:<AWS_ACC_ID>:function:pullYouTubeData:$LATEST
+        snspublish_TopicArn_9f7c7b61: arn:aws:sns:ap-southeast-2:<AWS_ACC_ID>:YTpipeline
+        gluestartJobRun_JobName_332c7705: Transform Channel Data-partitioning
+        gluestartJobRun_JobName_a2ae2ae4: Transform Video Data-partitioning
+        lambdainvoke_FunctionName_0cebf9d3: >-
+          arn:aws:lambda:ap-southeast-2:<AWS_ACC_ID>:function:pushYouTubeDataGoogleDrive:$LATEST
+      RoleArn:
+        Fn::GetAtt:
+          - Role647ed485
+          - Arn
+      StateMachineName: StateMachine7c3b9650
+      StateMachineType: STANDARD
+      EncryptionConfiguration:
+        Type: AWS_OWNED_KEY
+      LoggingConfiguration:
+        Level: 'ALL'
+        IncludeExecutionData: true
+        Destinations:
+          - CloudWatchLogsLogGroup:
+              LogGroupArn:
+                Fn::GetAtt:
+                  - LogGroup358bbcbc
+                  - Arn
+  Role647ed485:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: StepFunctions_IAM_ROLE_YouTubeDataFlow-v16d898009
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+            Action: sts:AssumeRole
+      MaxSessionDuration: 3600
+  Policyad60f8eb:
+    Type: AWS::IAM::RolePolicy
+    Properties:
+      PolicyName: GlueStartJobRunFullAccessPolicy01221935
+      RoleName:
+        Ref: Role647ed485
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - glue:StartJobRun
+            Resource:
+              - '*'
+  Policya2af6ceb:
+    Type: AWS::IAM::RolePolicy
+    Properties:
+      PolicyName: XRayAccessPolicy972830f7
+      RoleName:
+        Ref: Role647ed485
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - xray:PutTraceSegments
+              - xray:PutTelemetryRecords
+              - xray:GetSamplingRules
+              - xray:GetSamplingTargets
+            Resource:
+              - '*'
+  Policye3a4a3cb:
+    Type: AWS::IAM::RolePolicy
+    Properties:
+      PolicyName: LambdaInvokeScopedAccessPolicy43f2a1c3
+      RoleName:
+        Ref: Role647ed485
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - lambda:InvokeFunction
+            Resource:
+              - >-
+                arn:aws:lambda:ap-southeast-2:<AWS_ACC_ID>:function:pullYouTubeData:*
+              - >-
+                arn:aws:lambda:ap-southeast-2:<AWS_ACC_ID>:function:pushYouTubeDataGoogleDrive:*
+          - Effect: Allow
+            Action:
+              - lambda:InvokeFunction
+            Resource:
+              - >-
+                arn:aws:lambda:ap-southeast-2:<AWS_ACC_ID>:function:pullYouTubeData
+              - >-
+                arn:aws:lambda:ap-southeast-2:<AWS_ACC_ID>:function:pushYouTubeDataGoogleDrive
+  Policya069aa69:
+    Type: AWS::IAM::RolePolicy
+    Properties:
+      PolicyName: CloudWatchLogsDeliveryFullAccessPolicy61fc721c
+      RoleName:
+        Ref: Role647ed485
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogDelivery
+              - logs:GetLogDelivery
+              - logs:UpdateLogDelivery
+              - logs:DeleteLogDelivery
+              - logs:ListLogDeliveries
+              - logs:PutResourcePolicy
+              - logs:DescribeResourcePolicies
+              - logs:DescribeLogGroups
+            Resource: '*'
+  Policy8e62fc4f:
+    Type: AWS::IAM::RolePolicy
+    Properties:
+      PolicyName: GlueCrawlerStart15b4b090
+      RoleName:
+        Ref: Role647ed485
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - glue:StartCrawler
+            Resource:
+              - arn:aws:glue:ap-southeast-2:<AWS_ACC_ID>:crawler/Glue_analysis
+  Policye02ee60d:
+    Type: AWS::IAM::RolePolicy
+    Properties:
+      PolicyName: sendSNSnotificationYTpipeline808f96da
+      RoleName:
+        Ref: Role647ed485
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - SNS:Publish
+            Resource:
+              - arn:aws:sns:ap-southeast-2:<AWS_ACC_ID>:YTpipeline
+  LogGroup358bbcbc:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/vendedlogs/states/StateMachine7c3b9650-Logs

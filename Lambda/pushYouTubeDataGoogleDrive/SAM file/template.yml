@@ -1,0 +1,110 @@
+# This AWS SAM template has been generated from your function's configuration. If
+# your function has one or more triggers, note that the AWS resources associated
+# with these triggers aren't fully specified in this template and include
+# placeholder values. Open this template in AWS Infrastructure Composer or your
+# favorite IDE and modify it to specify a serverless application with other AWS
+# resources.
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: An AWS Serverless Application Model template describing your function.
+Resources:
+  pushYouTubeDataGoogleDrive:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Description: ''
+      MemorySize: 128
+      Timeout: 900
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.13
+      Architectures:
+        - x86_64
+      EphemeralStorage:
+        Size: 512
+      EventInvokeConfig:
+        MaximumEventAgeInSeconds: 21600
+        MaximumRetryAttempts: 2
+      Layers:
+        - >-
+          arn:aws:lambda:ap-southeast-2:336392948345:layer:AWSSDKPandas-Python313:1
+        - !Ref Layer1
+        - !Ref Layer2
+        - !Ref Layer3
+      PackageType: Zip
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:CreateBucket
+                - s3:PutObject
+                - s3:GetBucketLocation
+                - s3:ListBucket
+                - s3:GetObject
+              Resource:
+                - arn:aws:s3:::youtube-channel-data-v1-02032025
+                - arn:aws:s3:::youtube-channel-data-v1-02032025/*
+            - Effect: Allow
+              Action:
+                - athena:StartQueryExecution
+                - athena:GetQueryExecution
+                - athena:GetQueryResults
+              Resource:
+                - arn:aws:athena:ap-southeast-2:<AWS_ACC_ID>:*
+            - Effect: Allow
+              Action:
+                - glue:GetDatabase
+                - glue:GetTable
+                - glue:GetPartitions
+              Resource:
+                - arn:aws:glue:ap-southeast-2:<AWS_ACC_ID>:catalog
+                - >-
+                  arn:aws:glue:ap-southeast-2:<AWS_ACC_ID>:database/glue_metadata_db_analysis_files
+                - arn:aws:glue:ap-southeast-2:<AWS_ACC_ID>:table/*/*
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: '*'
+      RecursiveLoop: Terminate
+      SnapStart:
+        ApplyOn: None
+      RuntimeManagementConfig:
+        UpdateRuntimeOn: Auto
+  # This resource represents your Layer with name
+# requests_and_google_api_python_client. To download the content of your
+# Layer, go to
+# 
+# aws.amazon.com/go/view?arn=arn%3Aaws%3Alambda%3Aap-southeast-2%3A<AWS_ACC_ID>%3Alayer%3Arequests_and_google_api_python_client%3A2&source=lambda
+  Layer1:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      ContentUri: ./requests_and_google_api_python_client
+      LayerName: requests_and_google_api_python_client
+      CompatibleRuntimes:
+        - python3.13
+  # This resource represents your Layer with name
+# AthenaGoofleDrive_pyathena_gspread. To download the content of your Layer,
+# go to
+# 
+# aws.amazon.com/go/view?arn=arn%3Aaws%3Alambda%3Aap-southeast-2%3A<AWS_ACC_ID>%3Alayer%3AAthenaGoofleDrive_pyathena_gspread%3A1&source=lambda
+  Layer2:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      ContentUri: ./AthenaGoofleDrive_pyathena_gspread
+      LayerName: AthenaGoofleDrive_pyathena_gspread
+      CompatibleRuntimes:
+        - python3.13
+        - python3.12
+  # This resource represents your Layer with name google_auth_oauthlib_v2. To
+# download the content of your Layer, go to
+# 
+# aws.amazon.com/go/view?arn=arn%3Aaws%3Alambda%3Aap-southeast-2%3A<AWS_ACC_ID>%3Alayer%3Agoogle_auth_oauthlib_v2%3A1&source=lambda
+  Layer3:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      ContentUri: ./google_auth_oauthlib_v2
+      LayerName: google_auth_oauthlib_v2
+      CompatibleRuntimes:
+        - python3.13
+        - python3.12

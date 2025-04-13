@@ -73,13 +73,13 @@ The pipeline integrates with Google Cloud APIs to extract and publish data:
 
 ## 📂 Sample Dataset
 
-📎 <a href="[https://example.com](https://docs.google.com/spreadsheets/d/1NEH8B7rigmO0bXc8RhGnYhc3kSwuLrGRsU0I-80r9CQ/edit?usp=sharing)" target="_blank" rel="noopener noreferrer">Explore the dataset</a>
+📎 <a href="https://docs.google.com/spreadsheets/d/1NEH8B7rigmO0bXc8RhGnYhc3kSwuLrGRsU0I-80r9CQ/edit?usp=sharing" target="_blank" rel="noopener noreferrer">Explore the dataset</a>
 
 ---
 
 ## 📈 Looker Dashboard
 
-📎 <a href="[https://example.com](https://lookerstudio.google.com/reporting/ee2852d5-50cf-4588-939f-266a045ac6cf/page/vk9FF)" target="_blank" rel="noopener noreferrer">View the dashboard</a>
+📎 <a href="https://lookerstudio.google.com/reporting/ee2852d5-50cf-4588-939f-266a045ac6cf/page/vk9FF" target="_blank" rel="noopener noreferrer">View the dashboard</a>
 
 ---
 

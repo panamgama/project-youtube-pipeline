@@ -70,6 +70,7 @@ The pipeline integrates with Google Cloud APIs to extract and publish data:
 ![alt text](https://github.com/panamgama/project-youtube-pipeline/blob/main/Flow-1.png "Architecture flow diagram")
 
 ---
+Use CTRL+click (on Windows and Linux) or CMD+click (on MacOS) on links below to open resources in a new tab.
 
 ## 📂 Sample Dataset
 
